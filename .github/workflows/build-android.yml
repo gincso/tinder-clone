@@ -41,7 +41,7 @@ jobs:
       - run: npx tsc --noEmit
 
   build-apk:
-    name: Build Debug APK
+    name: Build Standalone APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: [typecheck]
@@ -77,19 +77,30 @@ jobs:
       - name: Prebuild Expo project
         run: npx expo prebuild --platform android --clean --no-install
 
-      - name: Create Metro config for Expo
+      - name: Create Metro config
         run: npx expo customize metro.config.js 2>/dev/null || true
 
-      - name: Build Android APK (debug)
+      - name: Create debug keystore for signing
+        run: |
+          keytool -genkey -v -keystore $HOME/debug.keystore \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 \
+            -validity 10000 -dname "CN=Android Debug,O=Android,C=US" \
+            -storepass android -keypass android
+
+      - name: Build standalone APK (release)
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file=$HOME/debug.keystore \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=androiddebugkey \
+            -Pandroid.injected.signing.key.password=android
 
-      - name: Upload Debug APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: flame-dating-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: flame-dating-standalone-apk
+          path: android/app/build/outputs/apk/release/*.apk
           retention-days: 14
 
   build-eas:
