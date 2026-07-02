@@ -51,8 +51,7 @@
         {
           "photosPermission": "Allow Flame to access your photos for your profile."
         }
-      ],
-      "react-native-webrtc"
+      ]
     ]
   }
 }
