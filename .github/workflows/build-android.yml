@@ -18,8 +18,13 @@ on:
           - production
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+env:
+  NODE_VERSION: '22'
+  JAVA_VERSION: '17'
+  ANDROID_BUILD_TOOLS: '34.0.0'
 
 jobs:
   typecheck:
@@ -30,48 +35,44 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       - run: npm ci
       - run: npx tsc --noEmit
 
-  lint:
-    name: Lint Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-      - run: npm ci
-      - run: npx expo lint 2>/dev/null || echo "No linter configured"
-
-  build-apk-direct:
+  build-apk:
     name: Build Debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: [typecheck]
-    if: always()
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup JDK 17
+      - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: ${{ env.JAVA_VERSION }}
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle files
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       - name: Prebuild Expo project
         run: npx expo prebuild --platform android --clean --no-install
@@ -86,9 +87,9 @@ jobs:
         with:
           name: flame-dating-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
-          retention-days: 7
+          retention-days: 14
 
-  build-apk-eas:
+  build-eas:
     name: Build Release APK (EAS)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -100,7 +101,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
       - name: Install dependencies
@@ -114,23 +115,23 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build Android APK
+      - name: Build Android APK with EAS
         if: env.EXPO_TOKEN != ''
         run: |
           PROFILE="${{ github.event.inputs.profile || 'preview' }}"
-          eas build --platform android --profile $PROFILE --non-interactive --no-wait
+          eas build --platform android --profile $PROFILE --non-interactive
 
-      - name: Upload APK Artifact
+      - name: Upload Release APK
         if: env.EXPO_TOKEN != ''
         uses: actions/upload-artifact@v4
         with:
           name: flame-dating-release-apk
-          path: |
-            *.apk
-            **/*.apk
+          path: '*.apk'
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 14
 
-      - name: Skip EAS (no EXPO_TOKEN)
+      - name: EAS build skipped
         if: env.EXPO_TOKEN == ''
-        run: echo "EXPO_TOKEN not configured. Set it in repo secrets to enable EAS Build."
+        run: |
+          echo "::warning::EXPO_TOKEN secret not configured."
+          echo "Set EXPO_TOKEN in repository secrets to enable EAS Build."

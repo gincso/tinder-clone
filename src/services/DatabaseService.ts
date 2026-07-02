@@ -19,6 +19,7 @@ import {
   Firestore,
 } from 'firebase/firestore';
 import { FIRESTORE_COLLECTIONS } from '../config/firebase';
+import { DEV_MODE } from '../config/devMode';
 import {
   UserProfile,
   SwipeAction,
@@ -27,14 +28,15 @@ import {
   DailyUsage,
 } from '../types';
 
-class DatabaseService {
+const USE_MOCK = DEV_MODE;
+
+class RealDatabaseService {
   private db: Firestore;
 
   constructor() {
     this.db = getFirestore();
   }
 
-  // ====== User Profiles ======
   async createProfile(userId: string, profile: Partial<UserProfile>): Promise<void> {
     const ref = doc(this.db, FIRESTORE_COLLECTIONS.PROFILES, userId);
     await setDoc(ref, {
@@ -68,19 +70,15 @@ class DatabaseService {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
   }
 
-  // ====== Swipes ======
   async recordSwipe(swipe: Omit<SwipeAction, 'id' | 'timestamp'>): Promise<void> {
     const ref = doc(collection(this.db, FIRESTORE_COLLECTIONS.SWIPES));
     await setDoc(ref, { ...swipe, id: ref.id, timestamp: Timestamp.now() });
-
-    // Check for match if liked
     if (swipe.action === 'like' || swipe.action === 'super_like') {
       await this.checkForMatch(swipe.userId, swipe.targetUserId);
     }
   }
 
   private async checkForMatch(userId: string, targetUserId: string): Promise<void> {
-    // Check if the other user already liked this user
     const swipesRef = collection(this.db, FIRESTORE_COLLECTIONS.SWIPES);
     const q = query(
       swipesRef,
@@ -89,9 +87,7 @@ class DatabaseService {
       where('action', 'in', ['like', 'super_like'])
     );
     const snapshot = await getDocs(q);
-
     if (!snapshot.empty) {
-      // It's a match!
       const matchRef = doc(collection(this.db, FIRESTORE_COLLECTIONS.MATCHES));
       await setDoc(matchRef, {
         id: matchRef.id,
@@ -102,7 +98,6 @@ class DatabaseService {
     }
   }
 
-  // ====== Daily Usage ======
   async getDailyUsage(userId: string): Promise<DailyUsage | null> {
     const today = new Date().toISOString().split('T')[0];
     const ref = doc(this.db, FIRESTORE_COLLECTIONS.USERS, userId, 'daily', today);
@@ -128,7 +123,6 @@ class DatabaseService {
     }
   }
 
-  // ====== Matches ======
   async getMatches(userId: string): Promise<Match[]> {
     const matchesRef = collection(this.db, FIRESTORE_COLLECTIONS.MATCHES);
     const q = query(
@@ -153,7 +147,6 @@ class DatabaseService {
     });
   }
 
-  // ====== Messages ======
   async sendMessage(matchId: string, senderId: string, text: string): Promise<void> {
     const ref = doc(collection(this.db, FIRESTORE_COLLECTIONS.MESSAGES));
     await setDoc(ref, {
@@ -165,8 +158,6 @@ class DatabaseService {
       type: 'text',
       read: false,
     });
-
-    // Update last message in match
     const matchRef = doc(this.db, FIRESTORE_COLLECTIONS.MATCHES, matchId);
     await updateDoc(matchRef, {
       lastMessage: { text, senderId, timestamp: Timestamp.now() },
@@ -186,7 +177,6 @@ class DatabaseService {
     });
   }
 
-  // ====== Subscription ======
   async updateSubscription(userId: string, tier: 'free' | 'premium' | 'platinum'): Promise<void> {
     const ref = doc(this.db, FIRESTORE_COLLECTIONS.SUBSCRIPTIONS, userId);
     await setDoc(ref, {
@@ -196,8 +186,6 @@ class DatabaseService {
       autoRenew: true,
       paymentProvider: 'stripe',
     });
-
-    // Update profile
     const profileRef = doc(this.db, FIRESTORE_COLLECTIONS.PROFILES, userId);
     await updateDoc(profileRef, {
       subscriptionTier: tier,
@@ -213,7 +201,6 @@ class DatabaseService {
     return snap.data();
   }
 
-  // ====== Video Calls ======
   async createVideoCall(
     matchId: string,
     callerId: string,
@@ -246,4 +233,8 @@ class DatabaseService {
   }
 }
 
-export const databaseService = new DatabaseService();
+import { MockDatabaseService } from './MockDatabaseService';
+
+export const databaseService: MockDatabaseService | RealDatabaseService = USE_MOCK
+  ? new MockDatabaseService()
+  : new RealDatabaseService();
