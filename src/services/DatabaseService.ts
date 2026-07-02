@@ -69,7 +69,7 @@ class DatabaseService {
   }
 
   // ====== Swipes ======
-  async recordSwipe(swipe: Omit<SwipeAction, 'id'>): Promise<void> {
+  async recordSwipe(swipe: Omit<SwipeAction, 'id' | 'timestamp'>): Promise<void> {
     const ref = doc(collection(this.db, FIRESTORE_COLLECTIONS.SWIPES));
     await setDoc(ref, { ...swipe, id: ref.id, timestamp: Timestamp.now() });
 
