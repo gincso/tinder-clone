@@ -246,7 +246,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => {
     <View style={styles.topBar}>
       <TouchableOpacity
         style={styles.topBarButton}
-        onPress={() => navigation.navigate('Settings')}
+        onPress={() => navigation.navigate('EditProfile')}
       >
         <Icon name="settings-outline" size={SIZES.icon} color={COLORS.text} />
       </TouchableOpacity>
