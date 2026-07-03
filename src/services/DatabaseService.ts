@@ -1,5 +1,7 @@
+import { getApp } from 'firebase/app';
 import {
   getFirestore,
+  initializeFirestore,
   collection,
   doc,
   setDoc,
@@ -43,7 +45,15 @@ class RealDatabaseService {
   private db: Firestore;
 
   constructor() {
-    this.db = getFirestore();
+    try {
+      // React Native requires long-polling; the default WebChannel transport
+      // can fail/crash on device. Fall back to getFirestore if already initialized.
+      this.db = initializeFirestore(getApp(), {
+        experimentalForceLongPolling: true,
+      });
+    } catch {
+      this.db = getFirestore();
+    }
   }
 
   async createProfile(userId: string, profile: Partial<UserProfile>): Promise<void> {
