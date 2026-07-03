@@ -19,7 +19,7 @@ import {
   MediaStream,
   MediaStreamTrack,
 } from 'react-native-webrtc';
-import Icon from 'react-native-vector-icons/Ionicons';
+import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS, SIZES, SHADOWS, FREE_TIER_LIMITS, PREMIUM_TIER_LIMITS } from '../../config/theme';
 import { databaseService } from '../../services/DatabaseService';
 import { authService } from '../../services/AuthService';

@@ -12,7 +12,7 @@ import {
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Swipeable } from 'react-native-gesture-handler';
-import Icon from 'react-native-vector-icons/Ionicons';
+import Icon from '@expo/vector-icons/Ionicons';
 import { getFirestore, doc, deleteDoc, collection } from 'firebase/firestore';
 import { FIRESTORE_COLLECTIONS } from '../../config/firebase';
 import { COLORS, SIZES, SHADOWS } from '../../config/theme';

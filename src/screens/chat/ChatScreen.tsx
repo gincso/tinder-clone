@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import Icon from 'react-native-vector-icons/Ionicons';
+import Icon from '@expo/vector-icons/Ionicons';
 import { COLORS, SIZES, SHADOWS } from '../../config/theme';
 import { databaseService } from '../../services/DatabaseService';
 import { authService } from '../../services/AuthService';
