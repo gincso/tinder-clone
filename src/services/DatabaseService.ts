@@ -30,6 +30,15 @@ import {
 
 const USE_MOCK = DEV_MODE;
 
+const getTimestampMs = (t: any): number => {
+  if (!t) return 0;
+  if (typeof t.toDate === 'function') return t.toDate().getTime();
+  if (t instanceof Date) return t.getTime();
+  if (typeof t.seconds === 'number') return t.seconds * 1000;
+  if (typeof t === 'string') return new Date(t).getTime();
+  return 0;
+};
+
 class RealDatabaseService {
   private db: Firestore;
 
@@ -127,24 +136,31 @@ class RealDatabaseService {
     const matchesRef = collection(this.db, FIRESTORE_COLLECTIONS.MATCHES);
     const q = query(
       matchesRef,
-      where('users', 'array-contains', userId),
-      orderBy('matchedAt', 'desc')
+      where('users', 'array-contains', userId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
+    const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
+    matches.sort((a, b) => getTimestampMs(b.matchedAt) - getTimestampMs(a.matchedAt));
+    return matches;
   }
 
   onMatchesChanged(userId: string, callback: (matches: Match[]) => void): () => void {
     const matchesRef = collection(this.db, FIRESTORE_COLLECTIONS.MATCHES);
     const q = query(
       matchesRef,
-      where('users', 'array-contains', userId),
-      orderBy('matchedAt', 'desc')
+      where('users', 'array-contains', userId)
     );
-    return onSnapshot(q, (snapshot) => {
-      const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
-      callback(matches);
-    });
+    return onSnapshot(q, 
+      (snapshot) => {
+        const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
+        matches.sort((a, b) => getTimestampMs(b.matchedAt) - getTimestampMs(a.matchedAt));
+        callback(matches);
+      },
+      (error) => {
+        console.error('onMatchesChanged error:', error);
+        callback([]);
+      }
+    );
   }
 
   async sendMessage(matchId: string, senderId: string, text: string): Promise<void> {
@@ -168,13 +184,19 @@ class RealDatabaseService {
     const messagesRef = collection(this.db, FIRESTORE_COLLECTIONS.MESSAGES);
     const q = query(
       messagesRef,
-      where('matchId', '==', matchId),
-      orderBy('timestamp', 'asc')
+      where('matchId', '==', matchId)
     );
-    return onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
-      callback(messages);
-    });
+    return onSnapshot(q, 
+      (snapshot) => {
+        const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+        messages.sort((a, b) => getTimestampMs(a.timestamp) - getTimestampMs(b.timestamp));
+        callback(messages);
+      },
+      (error) => {
+        console.error('onMessagesChanged error:', error);
+        callback([]);
+      }
+    );
   }
 
   async updateSubscription(userId: string, tier: 'free' | 'premium' | 'platinum'): Promise<void> {
